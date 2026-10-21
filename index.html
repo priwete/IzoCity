@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Изо-Сити — градостроительный симулятор</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <!-- HUD сверху -->
+    <div id="hud">
+      <div class="hud-item"><span class="label">БЮДЖЕТ</span><span id="hud-budget" class="value">$20,000</span></div>
+      <div class="hud-item"><span class="label">НАСЕЛЕНИЕ</span><span id="hud-pop" class="value">10</span></div>
+      <div class="hud-item"><span class="label">УРОВЕНЬ</span><span id="hud-level" class="value">1</span></div>
+      <div class="hud-item"><span class="label">РЕКОРД</span><span id="hud-record" class="value">—</span></div>
+      <div class="hud-item hud-flow"><span class="label">ПОТОК/С</span><span id="hud-flow" class="value">$0</span></div>
+    </div>
+
+    <!-- Сообщение-подсказка -->
+    <div id="toast"></div>
+
+    <!-- Панель инструментов -->
+    <div id="toolbar">
+      <button class="tool" data-tool="zoneR" title="Зона жилая (1)">🏠 R</button>
+      <button class="tool" data-tool="zoneC" title="Зона коммерческая (2)">🏢 C</button>
+      <button class="tool" data-tool="zoneI" title="Зона промышленная (3)">🏭 I</button>
+      <button class="tool" data-tool="road" title="Дорога (4)">🛣️ Дорога</button>
+      <button class="tool" data-tool="bulldoze" title="Снос (5)">💣 Снос</button>
+      <div class="sep"></div>
+      <button class="tool build" data-tool="house" title="Жилой дом">Дом $1k</button>
+      <button class="tool build" data-tool="office" title="Офис">Офис $5k</button>
+      <button class="tool build" data-tool="factory" title="Завод">Завод $3k</button>
+      <button class="tool build" data-tool="school" title="Школа">Школа $8k</button>
+      <button class="tool build" data-tool="hospital" title="Больница">Больница $12k</button>
+    </div>
+
+    <!-- Верхние кнопки управления -->
+    <div id="topbtns">
+      <button id="btn-pause" title="Пауза (P)">⏸</button>
+      <button id="btn-restart" title="Заново">↺</button>
+      <button id="btn-sound" title="Звук">🔊</button>
+      <button id="btn-fullscreen" title="На весь экран">⛶</button>
+    </div>
+
+    <!-- Стартовое меню (при открытии страницы) -->
+    <div id="startmenu">
+      <div class="menu-box">
+        <h1>ИЗО-СИТИ</h1>
+        <p class="menu-sub">Изометрический градостроительный симулятор</p>
+        <p class="menu-goal">Цель: накопить <b>$5,000,000,000</b> и не разориться</p>
+        <button id="menu-play">ИГРАТЬ</button>
+        <div class="menu-help">
+          <b>Управление:</b><br>
+          Клик — инструмент · WASD — камера · Колесо — зум<br>
+          1–5 — инструменты · P / Esc — пауза · Esc — отмена
+        </div>
+      </div>
+    </div>
+
+    <!-- Мини-меню паузы -->
+    <div id="pause-menu" class="hidden">
+      <div class="pause-box">
+        <h2>ПАУЗА</h2>
+        <button id="btn-resume">ПРОДОЛЖИТЬ</button>
+        <button id="btn-menu-sound">ЗВУК: ВКЛ</button>
+        <button id="btn-menu-restart">ЗАНОВО</button>
+      </div>
+    </div>
+
+    <!-- Оверлей победы/поражения -->
+    <div id="overlay" class="hidden">
+      <div class="overlay-box">
+        <h1 id="overlay-title">ГОРОД</h1>
+        <p id="overlay-sub"></p>
+        <div id="overlay-stats"></div>
+        <button id="overlay-restart">ЗАНОВО</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
