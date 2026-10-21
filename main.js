@@ -126,6 +126,7 @@ function start() {
 // ==== Автопауза при скрытии вкладки ====
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    game.saveGame(); // Сохраняем при сворачивании
     game.pause();
     input.clearHeld();
     if (!game.isMenuOpen && !game.isOver && !game.isPaused) {
@@ -134,12 +135,16 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+// Сохранение перед закрытием страницы
+window.addEventListener("beforeunload", () => {
+  game.saveGame();
+});
+
 // ==== Обработчик клавиш для паузы ====
 window.addEventListener("keydown", (e) => {
   if (e.code === "KeyP" || e.code === "Escape") {
     if (game.isMenuOpen || game.isOver) return;
 
-    // Если выбран инструмент, Esc сначала сбрасывает его
     if (e.code === "Escape" && game.player.tool && !game.isPaused) {
       game.player.setTool(null);
       game.refreshToolbar();
