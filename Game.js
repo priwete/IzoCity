@@ -22,7 +22,7 @@ const REFUND_RATE = 0.75;
 
 const START_BUDGET = 20000;
 const START_POPULATION = 10;
-const WIN_TARGET = 5000000;
+const WIN_TARGET = 5000000; // ИЗМЕНЕНО: 5 миллионов (игра проходится за ~20-30 минут)
 const LOSE_DEBT = -10000;
 const LOW_DEBT = -5000;
 
@@ -55,6 +55,7 @@ export class Game {
     this.outflowTimer = 0;
     this.subsidyTimer = 0;
     this.time = 0;
+    this.saveTimer = 0; // Таймер автосохранения
 
     this.toastTimer = 0;
     this.toastEl = document.getElementById("toast");
@@ -84,6 +85,12 @@ export class Game {
   }
 
   initMap() {
+    // Пытаемся загрузить сохранение
+    if (this.loadGame()) {
+      return; // Если сохранение найдено, карта уже восстановлена
+    }
+
+    // Если сохранения нет — создаём новую карту
     this.cells = [];
     for (let y = 0; y < MAP_H; y++) {
       const row = [];
@@ -102,6 +109,45 @@ export class Game {
     const houseX = roadX + 1;
     const houseY = roadY - 1;
     this.cells[houseY][houseX].building = "house";
+  }
+
+  // ===== СОХРАНЕНИЕ И ЗАГРУЗКА =====
+  saveGame() {
+    if (this.isMenuOpen || this.isOver) return;
+    try {
+      const data = {
+        cells: this.cells,
+        budget: this.budget,
+        population: this.population,
+        time: this.time,
+      };
+      localStorage.setItem("isocity_save", JSON.stringify(data));
+    } catch (e) {
+      console.warn("Не удалось сохранить игру", e);
+    }
+  }
+
+  loadGame() {
+    try {
+      const raw = localStorage.getItem("isocity_save");
+      if (!raw) return false;
+
+      const data = JSON.parse(raw);
+      if (!data || !data.cells || data.cells.length !== MAP_H) return false;
+
+      this.cells = data.cells;
+      this.budget = data.budget ?? START_BUDGET;
+      this.population = data.population ?? START_POPULATION;
+      this.time = data.time ?? 0;
+
+      this.level = this.computeLevel(this.population);
+      this.everHadHouse = this.countBuildings("house") > 0;
+
+      return true;
+    } catch (e) {
+      console.warn("Не удалось загрузить игру", e);
+      return false;
+    }
   }
 
   getCell(x, y) {
@@ -138,6 +184,8 @@ export class Game {
   }
 
   restart() {
+    try { localStorage.removeItem("isocity_save"); } catch(e) {} // Очистка сохранения при рестарте
+    
     this.initMap();
     this.budget = START_BUDGET;
     this.population = START_POPULATION;
@@ -151,6 +199,7 @@ export class Game {
     this.outflowTimer = 0;
     this.subsidyTimer = 0;
     this.time = 0;
+    this.saveTimer = 0;
     this.smokeParticles = [];
     this.player.setTool(null);
     this.refreshToolbar();
@@ -180,11 +229,13 @@ export class Game {
     `;
     ov.classList.remove("hidden");
     if (this.input) this.input.clearHeld();
+    
+    try { localStorage.removeItem("isocity_save"); } catch(e) {} // Стираем сохранение при конце игры
   }
 
   win() {
     this.isWin = true;
-    this.gameOver("ГОРОД-МИЛЛИАРДЕР", "Вы достигли бюджета в $5,000,000,000!");
+    this.gameOver("ГОРОД-МИЛЛИОНЕР", "Вы достигли бюджета в $5,000,000!");
   }
 
   applyAction(gx, gy) {
@@ -383,6 +434,13 @@ export class Game {
     }
 
     this.updateHud();
+
+    // Автосохранение каждые 5 секунд
+    this.saveTimer += dt;
+    if (this.saveTimer >= 5) {
+      this.saveTimer = 0;
+      this.saveGame();
+    }
   }
 
   updateSmoke(dt, factories) {
@@ -772,7 +830,6 @@ export class Game {
     }
   }
 
-  // Маленькая изометрическая коробка для деталей на крыше
   isoSmallBox(ctx, x, y, halfW, height, colL, colR) {
     ctx.fillStyle = colL;
     ctx.beginPath();
@@ -802,7 +859,6 @@ export class Game {
     ctx.fill();
   }
 
-  // ---------- ЖИЛОЙ ДОМ ----------
   drawHouse(ctx, x, y, z) {
     const H = 16;
     const wallL = "#b8905e";
@@ -813,7 +869,6 @@ export class Game {
     this.isoShadow(ctx, x, y, z, 1, 1);
     const { hw, hh } = this.isoBox(ctx, x, y, z, 4, H, wallL, wallR);
 
-    // ОДНО окно по центру ЛЕВОЙ стены
     const winCenterU = 0.5;
     const winW = 0.22;
     const winVB = 0.35;
@@ -839,7 +894,6 @@ export class Game {
     ctx.closePath();
     ctx.fill();
 
-    // блик внутри окна
     ctx.fillStyle = "rgba(255,255,220,0.7)";
     const b0 = pointAtL(u0 + (u1 - u0) * 0.15, winVB + (winVT - winVB) * 0.45);
     const b1 = pointAtL(u0 + (u1 - u0) * 0.55, winVB + (winVT - winVB) * 0.45);
@@ -853,7 +907,6 @@ export class Game {
     ctx.closePath();
     ctx.fill();
 
-    // ПРАВАЯ стена — только дверь по центру, без окон
     const du0 = 0.4, du1 = 0.6;
     const dv0 = 0, dv1 = 0.5;
     const pointAtR = (u, v) => {
@@ -877,7 +930,6 @@ export class Game {
     this.isoGableRoof(ctx, x, y, z, hw * 1.05, hh * 1.05, H * z, 8, roofL, roofR);
   }
 
-  // ---------- ОФИС ----------
   drawOffice(ctx, x, y, z) {
     const H = 34;
     const wallL = "#4f6f8a";
@@ -906,7 +958,6 @@ export class Game {
     }
   }
 
-   // ---------- ЗАВОД ----------
   drawFactory(ctx, x, y, z) {
     const H = 18;
     const wallL = "#5a4a3a";
@@ -919,26 +970,22 @@ export class Game {
     this.isoWindows(ctx, x, y, z, hw, hh, H * z, 'L', 2, 3, "#ffcc66", false);
     this.isoWindows(ctx, x, y, z, hw, hh, H * z, 'R', 2, 3, "#ffcc66", false);
 
-    // КРЫША
     this.isoFlatRoof(ctx, x, y, z, hw, hh, H * z, roof);
 
     const roofCenterY = y - H * z;
 
-    // 1. Маленький кубик слева (правильная изометрия)
     const b1x = x - 10 * z;
     const b1y = roofCenterY + 3 * z;
     const b1w = 3 * z;
     const b1h = 3 * z;
     this.isoSmallBox(ctx, b1x, b1y, b1w, b1h, "#4a3c30", "#685544");
 
-    // 2. Маленький кубик справа (правильная изометрия)
     const b2x = x + 6 * z;
     const b2y = roofCenterY + 6 * z;
     const b2w = 2.5 * z;
     const b2h = 2.5 * z;
     this.isoSmallBox(ctx, b2x, b2y, b2w, b2h, "#4a3c30", "#685544");
 
-    // 3. Люк (вентиляция) на крыше — ровный изометрический ромб
     const lx = x - 1 * z;
     const ly = roofCenterY + 8 * z;
     const lw = 2.5 * z;
@@ -952,53 +999,46 @@ export class Game {
     ctx.closePath();
     ctx.fill();
 
-    // ===== ТРУБА =====
     const tx = x + 5 * z;
-    const ty = roofCenterY + 1 * z; // точка стыка с крышей
+    const ty = roofCenterY + 1 * z;
     const tw = 3.5 * z;
     const th = 22 * z;
 
-    // Правильная геометрия основания трубы (темный изометрический эллипс, сливающийся с крышей)
     ctx.fillStyle = "#2a2a2a";
     ctx.beginPath();
     ctx.ellipse(tx, ty, tw, tw * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Тело трубы: Левая половина (тёмная)
     ctx.fillStyle = "#3a3a3a";
     ctx.beginPath();
     ctx.moveTo(tx - tw, ty);
     ctx.lineTo(tx - tw, ty - th);
-    ctx.lineTo(tx, ty - th - tw * 0.4); // верхний левый край
-    ctx.lineTo(tx, ty - tw * 0.4);      // нижний левый край
+    ctx.lineTo(tx, ty - th - tw * 0.4);
+    ctx.lineTo(tx, ty - tw * 0.4);
     ctx.closePath();
     ctx.fill();
 
-    // Тело трубы: Правая половина (светлая)
     ctx.fillStyle = "#5a5a5a";
     ctx.beginPath();
     ctx.moveTo(tx + tw, ty);
     ctx.lineTo(tx + tw, ty - th);
-    ctx.lineTo(tx, ty - th - tw * 0.4); // верхний правый край
-    ctx.lineTo(tx, ty - tw * 0.4);      // нижний правый край
+    ctx.lineTo(tx, ty - th - tw * 0.4);
+    ctx.lineTo(tx, ty - tw * 0.4);
     ctx.closePath();
     ctx.fill();
 
-    // Верхний срез (эллипс)
     ctx.fillStyle = "#1a1a1a";
     ctx.beginPath();
     ctx.ellipse(tx, ty - th, tw, tw * 0.4, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Внутреннее отверстие
     ctx.fillStyle = "#000000";
     ctx.beginPath();
     ctx.ellipse(tx, ty - th, tw * 0.6, tw * 0.25, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // ---------- ШКОЛА ----------
-    drawSchool(ctx, x, y, z) {
+  drawSchool(ctx, x, y, z) {
     const H = 22;
     const wallL = "#c4b48c";
     const wallR = "#e0d0a8";
@@ -1011,7 +1051,6 @@ export class Game {
     const Hpix = H * z;
     this.isoFloor(ctx, x, y, z, hw, hh);
     
-    // стены
     ctx.fillStyle = wallL;
     ctx.beginPath();
     ctx.moveTo(x - hw, y);
@@ -1035,13 +1074,10 @@ export class Game {
 
     this.isoFlatRoof(ctx, x, y, z, hw, hh, Hpix, roof);
 
-    // ФЛАГ (основание точно на крыше, опущен ниже)
     const fx = x - hw * 0.5;
-    // Опускаем флаг ближе к центру крыши по оси Y (добавляем смещение вниз)
     const fy = y - hh * 0.5 - Hpix + 3 * z; 
-    const poleH = 14 * z;           // высота флагштока
+    const poleH = 14 * z;
     
-    // Флагшток
     ctx.strokeStyle = "#cccccc";
     ctx.lineWidth = Math.max(1, 1.2 * z);
     ctx.beginPath();
@@ -1049,7 +1085,6 @@ export class Game {
     ctx.lineTo(fx, fy - poleH);
     ctx.stroke();
     
-    // Флаг
     ctx.fillStyle = "#e8e840";
     ctx.beginPath();
     ctx.moveTo(fx, fy - poleH);
@@ -1058,7 +1093,7 @@ export class Game {
     ctx.closePath();
     ctx.fill();
   }
-    // ---------- БОЛЬНИЦА ----------
+
   drawHospital(ctx, x, y, z) {
     const H = 26;
     const wallL = "#d0dae0";
@@ -1067,7 +1102,6 @@ export class Game {
 
     this.isoShadow(ctx, x, y, z, 1, 1);
     
-    // Стены без серого цоколя
     const hw = (HALF_W - 4) * z;
     const hh = (HALF_H - 2) * z;
     const Hpix = H * z;
@@ -1096,35 +1130,24 @@ export class Game {
 
     this.isoFlatRoof(ctx, x, y, z, hw, hh, Hpix, roof);
 
-    // ===== КРАСНЫЙ КРЕСТ (ИДЕАЛЬНАЯ ИЗОМЕТРИЯ) =====
     ctx.save();
     
-    // Переносим начало координат в центр крыши
     const cx = x;
     const cy = y - Hpix;
     ctx.translate(cx, cy);
-    
-    // Изометрическая проекция (сжимаем по Y и поворачиваем на 45 градусов)
     ctx.scale(1, 0.5);
     ctx.rotate(Math.PI / 4);
 
-    // Размеры креста (квадратные)
     const size = hw * 0.55;
     const thickness = size * 0.35;
 
-    // Теперь рисуем 2 обычных прямоугольника (они автоматически лягут в изометрию)
     ctx.fillStyle = "#e03030";
-    
-    // Горизонтальная полоса
     ctx.fillRect(-size / 2, -thickness / 2, size, thickness);
-    
-    // Вертикальная полоса
     ctx.fillRect(-thickness / 2, -size / 2, thickness, size);
 
     ctx.restore();
-    // ===============================================
   }
-  // ---------- Дым ----------
+
   drawSmoke(ctx, cam) {
     for (const p of this.smokeParticles) {
       const t = p.life / p.maxLife;
@@ -1141,7 +1164,6 @@ export class Game {
     }
   }
 
-  // ---------- Подсветка ----------
   drawHover(ctx, cam) {
     const { gx, gy } = this.player.hover;
     if (gx < 0 || gy < 0 || gx >= MAP_W || gy >= MAP_H) return;
