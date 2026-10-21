@@ -1,5 +1,5 @@
 // Игровое состояние мира: карта, экономика, население, рендер
-import * as Grid from "./collision.js";
+import * as Grid from "./Collision.js";
 
 export const MAP_W = 20;
 export const MAP_H = 15;
